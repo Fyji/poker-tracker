@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 interface Game {
   id: string;
@@ -18,6 +19,8 @@ interface Game {
   playedAt: string;
   playerCount: number;
   totalPot: number;
+  csvUploaded?: boolean;
+  totalHands?: number | null;
 }
 
 export default function GamesPage() {
@@ -59,6 +62,7 @@ export default function GamesPage() {
                   <TableHead className="text-zinc-400 text-right">תאריך</TableHead>
                   <TableHead className="text-zinc-400 text-right">שחקנים</TableHead>
                   <TableHead className="text-zinc-400 text-right">סה״כ באי-אין</TableHead>
+                  <TableHead className="text-zinc-400 text-right">ניתוח</TableHead>
                   <TableHead className="text-zinc-400 text-right"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -71,11 +75,20 @@ export default function GamesPage() {
                     <TableCell>{g.playerCount}</TableCell>
                     <TableCell className="font-mono">₪{g.totalPot.toFixed(2)}</TableCell>
                     <TableCell>
+                      {g.csvUploaded ? (
+                        <Badge className="bg-emerald-900 text-emerald-300 border-emerald-700 text-xs">CSV</Badge>
+                      ) : g.totalHands ? (
+                        <Badge className="bg-yellow-900 text-yellow-300 border-yellow-700 text-xs">API ({g.totalHands})</Badge>
+                      ) : (
+                        <span className="text-zinc-600 text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <Link
                         href={`/games/${g.id}`}
                         className="text-emerald-400 hover:text-emerald-300 text-sm"
                       >
-                        פרטים →
+                        ניתוח →
                       </Link>
                     </TableCell>
                   </TableRow>

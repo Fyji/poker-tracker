@@ -17,12 +17,16 @@ model Player {
 }
 
 model Game {
-  id          String       @id @default(cuid())
-  pokernowId  String       @unique
-  playedAt    DateTime     @default(now())
-  createdAt   DateTime     @default(now())
-  gameResults GameResult[]
-  debts       Debt[]
+  id            String         @id @default(cuid())
+  pokernowId    String         @unique
+  playedAt      DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  csvUploaded   Boolean        @default(false)
+  totalHands    Int?
+  gameResults   GameResult[]
+  debts         Debt[]
+  logs          GameLog[]
+  handSummaries HandSummary[]
 
   @@map("games")
 }
@@ -55,6 +59,43 @@ model Debt {
   game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
   @@map("debts")
+}
+
+model GameLog {
+  id         String    @id @default(cuid())
+  gameId     String
+  handNumber Int
+  position   String
+  playerName String
+  action     String
+  amount     Float?
+  cards      String?
+  potSize    Float?
+  timestamp  DateTime?
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@map("game_logs")
+}
+
+model HandSummary {
+  id          String  @id @default(cuid())
+  gameId      String
+  handNumber  Int
+  winner      String?
+  winAmount   Float?
+  winHand     String?
+  potSize     Float?
+  flop        String?
+  turn        String?
+  river       String?
+  duration    Int?
+  playerCount Int?
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, handNumber])
+  @@map("hand_summaries")
 }
 
 model Payment {

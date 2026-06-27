@@ -18,6 +18,8 @@ export async function GET() {
     playedAt: g.playedAt,
     playerCount: g.gameResults.length,
     totalPot: g.gameResults.reduce((sum, r) => sum + r.buyIn, 0),
+    csvUploaded: g.csvUploaded,
+    totalHands: g.totalHands,
     results: g.gameResults
       .map((r) => ({
         playerName: r.player.name,

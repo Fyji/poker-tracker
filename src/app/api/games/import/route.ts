@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parsePokerLogs } from "@/lib/poker-parser";
 
 function extractGameId(input: string): string | null {
   // Handle various URL formats or direct game ID
@@ -162,6 +163,69 @@ export async function POST(req: NextRequest) {
       });
 
       results.push({ playerName, buyIn, net });
+    }
+
+    // Try to fetch and parse game logs (even partial ~50 entries)
+    try {
+      const logUrl = `https://www.pokernow.com/games/${gameId}/log`;
+      const logResponse = await fetch(logUrl);
+      if (logResponse.ok) {
+        const logData = await logResponse.json();
+        if (logData.logs && Array.isArray(logData.logs)) {
+          const entries = logData.logs.map((l: { msg: string }) => l.msg);
+          const timestamps = logData.logs.map((l: { at: string }) => new Date(l.at));
+          const parsed = parsePokerLogs(entries, timestamps);
+
+          if (parsed.hands.length > 0) {
+            // Store logs
+            const logRecords = [];
+            for (const hand of parsed.hands) {
+              for (const event of hand.events) {
+                logRecords.push({
+                  gameId: game.id,
+                  handNumber: hand.handNumber,
+                  position: event.position,
+                  playerName: event.playerName,
+                  action: event.action,
+                  amount: event.amount || null,
+                  cards: event.cards ? JSON.stringify(event.cards) : null,
+                  potSize: hand.potSize || null,
+                  timestamp: hand.startTime || null,
+                });
+              }
+            }
+
+            for (let i = 0; i < logRecords.length; i += 500) {
+              await prisma.gameLog.createMany({ data: logRecords.slice(i, i + 500) });
+            }
+
+            const summaryRecords = parsed.hands.map((h) => ({
+              gameId: game.id,
+              handNumber: h.handNumber,
+              winner: h.winner || null,
+              winAmount: h.winAmount || null,
+              winHand: h.winHand || null,
+              potSize: h.potSize || null,
+              flop: h.flop ? JSON.stringify(h.flop) : null,
+              turn: h.turn || null,
+              river: h.river || null,
+              duration: null,
+              playerCount: h.playerCount || null,
+            }));
+
+            for (let i = 0; i < summaryRecords.length; i += 500) {
+              await prisma.handSummary.createMany({ data: summaryRecords.slice(i, i + 500) });
+            }
+
+            await prisma.game.update({
+              where: { id: game.id },
+              data: { totalHands: parsed.hands.length },
+            });
+          }
+        }
+      }
+    } catch (logError) {
+      console.error("Failed to fetch game logs (non-fatal):", logError);
     }
 
     // Recalculate debts
