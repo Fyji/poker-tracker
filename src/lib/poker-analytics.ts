@@ -97,10 +97,14 @@ export function computeAnalytics(game: ParsedGame): GameAnalytics {
   const actionDistribution: Record<string, Record<string, number>> = {};
   for (const name of allPlayers) {
     actionDistribution[name] = { calls: 0, raises: 0, bets: 0, folds: 0, checks: 0 };
+    const actionMap: Record<string, string> = { call: 'calls', raise: 'raises', bet: 'bets', fold: 'folds', check: 'checks' };
     for (const hand of hands) {
       for (const event of hand.events) {
-        if (event.playerName === name && event.action in actionDistribution[name]) {
-          actionDistribution[name][event.action]++;
+        if (event.playerName === name) {
+          const mapped = actionMap[event.action];
+          if (mapped && mapped in actionDistribution[name]) {
+            actionDistribution[name][mapped]++;
+          }
         }
       }
     }
@@ -161,6 +165,13 @@ function computePlayerStats(name: string, hands: ParsedHand[]): PlayerAnalytics 
     if (hand.startingStacks && hand.startingStacks[name] !== undefined) {
       runningChips = hand.startingStacks[name];
     }
+
+    // Compute net for this hand: winAmount - totalPutIn
+    const totalPutInForChips = playerEvents
+      .filter((e) => ["call", "raise", "bet", "small_blind", "big_blind"].includes(e.action))
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
+    const wonThisHand = hand.winner === name ? (hand.winAmount || 0) : 0;
+    runningChips += wonThisHand - totalPutInForChips;
 
     // VPIP: voluntarily put money in pot (call/raise/bet pre-flop, excluding blinds)
     const preFlopActions = playerEvents.filter(
