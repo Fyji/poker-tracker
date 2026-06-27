@@ -45,7 +45,7 @@ export function computeAnalytics(game: ParsedGame): GameAnalytics {
   const { hands } = game;
 
   // Summary
-  const pots = hands.map((h) => h.potSize || 0).filter((p) => p > 0);
+  const pots = hands.map((h) => (h.potSize || 0) / 100).filter((p) => p > 0);
   const totalHands = hands.length;
   const avgPotSize = pots.length > 0 ? pots.reduce((a, b) => a + b, 0) / pots.length : 0;
   const biggestPot = pots.length > 0 ? Math.max(...pots) : 0;
@@ -91,7 +91,7 @@ export function computeAnalytics(game: ParsedGame): GameAnalytics {
   // Pot sizes over time
   const potSizes = hands
     .filter((h) => h.potSize && h.potSize > 0)
-    .map((h) => ({ hand: h.handNumber, pot: h.potSize! }));
+    .map((h) => ({ hand: h.handNumber, pot: h.potSize! / 100 }));
 
   // Action distribution per player
   const actionDistribution: Record<string, Record<string, number>> = {};
@@ -166,12 +166,14 @@ function computePlayerStats(name: string, hands: ParsedHand[]): PlayerAnalytics 
       runningChips = hand.startingStacks[name];
     }
 
-    // Compute net for this hand: winAmount - totalPutIn
-    const totalPutInForChips = playerEvents
+    // Compute net for this hand: if won, net = potSize - amountPutIn. If lost, net = -amountPutIn
+    const totalPutIn = playerEvents
       .filter((e) => ["call", "raise", "bet", "small_blind", "big_blind"].includes(e.action))
       .reduce((sum, e) => sum + (e.amount || 0), 0);
-    const wonThisHand = hand.winner === name ? (hand.winAmount || 0) : 0;
-    runningChips += wonThisHand - totalPutInForChips;
+    const isWinner = hand.winner === name;
+    const handNet = isWinner ? (hand.potSize || hand.winAmount || 0) - totalPutIn : -totalPutIn;
+    // Convert from chips to shekels (divide by 100)
+    runningChips += handNet / 100;
 
     // VPIP: voluntarily put money in pot (call/raise/bet pre-flop, excluding blinds)
     const preFlopActions = playerEvents.filter(
@@ -189,15 +191,15 @@ function computePlayerStats(name: string, hands: ParsedHand[]): PlayerAnalytics 
       switch (e.action) {
         case "call":
           calls++;
-          if (e.amount) callAmounts.push(e.amount);
+          if (e.amount) callAmounts.push(e.amount / 100);
           break;
         case "raise":
           raises++;
-          if (e.amount) raiseAmounts.push(e.amount);
+          if (e.amount) raiseAmounts.push(e.amount / 100);
           break;
         case "bet":
           bets++;
-          if (e.amount) betAmounts.push(e.amount);
+          if (e.amount) betAmounts.push(e.amount / 100);
           break;
         case "fold":
           folds++;
@@ -212,7 +214,7 @@ function computePlayerStats(name: string, hands: ParsedHand[]): PlayerAnalytics 
     const won = hand.winner === name;
     if (won) {
       handsWon++;
-      const winAmount = hand.winAmount || 0;
+      const winAmount = (hand.winAmount || 0) / 100;
       totalWon += winAmount;
       if (winAmount > biggestWin) biggestWin = winAmount;
       currentStreak++;
@@ -225,10 +227,10 @@ function computePlayerStats(name: string, hands: ParsedHand[]): PlayerAnalytics 
       }
     } else {
       // Calculate loss for this hand (sum of amounts put in)
-      const totalPutIn = playerEvents
+      const totalPutInLoss = playerEvents
         .filter((e) => ["call", "raise", "bet", "small_blind", "big_blind"].includes(e.action))
-        .reduce((sum, e) => sum + (e.amount || 0), 0);
-      if (totalPutIn > biggestLoss) biggestLoss = totalPutIn;
+        .reduce((sum, e) => sum + (e.amount || 0), 0) / 100;
+      if (totalPutInLoss > biggestLoss) biggestLoss = totalPutInLoss;
 
       currentStreak = 0;
       currentLoseStreak++;
@@ -289,8 +291,8 @@ function computeHeadToHead(p1: string, p2: string, hands: ParsedHand[]): HeadToH
   }
 
   return {
-    calls: { count: callCount, avgAmount: callCount > 0 ? callTotal / callCount : 0 },
-    raises: { count: raiseCount, avgAmount: raiseCount > 0 ? raiseTotal / raiseCount : 0 },
+    calls: { count: callCount, avgAmount: callCount > 0 ? (callTotal / callCount) / 100 : 0 },
+    raises: { count: raiseCount, avgAmount: raiseCount > 0 ? (raiseTotal / raiseCount) / 100 : 0 },
     folds: foldCount,
   };
 }
