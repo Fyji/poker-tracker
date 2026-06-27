@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use, useCallback } from "react";
+import React, { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -293,7 +293,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
                     {Object.entries(analytics.playerStats)
                       .sort(([, a], [, b]) => b.winRate - a.winRate)
                       .map(([name, stats]) => (
-                        <>
+                        <React.Fragment key={name}>
                           <TableRow
                             key={name}
                             className="border-zinc-800 cursor-pointer hover:bg-zinc-800/50"
@@ -360,7 +360,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
                               </TableCell>
                             </TableRow>
                           )}
-                        </>
+                        </React.Fragment>
                       ))}
                   </TableBody>
                 </Table>
