@@ -45,7 +45,7 @@ export function computeAnalytics(game: ParsedGame): GameAnalytics {
   const { hands } = game;
 
   // Summary
-  const pots = hands.map((h) => (h.potSize || 0) / 100).filter((p) => p > 0);
+  const pots = hands.map((h) => (h.potSize || 0)).filter((p) => p > 0);
   const totalHands = hands.length;
   const avgPotSize = pots.length > 0 ? pots.reduce((a, b) => a + b, 0) / pots.length : 0;
   const biggestPot = pots.length > 0 ? Math.max(...pots) : 0;
@@ -91,7 +91,7 @@ export function computeAnalytics(game: ParsedGame): GameAnalytics {
   // Pot sizes over time
   const potSizes = hands
     .filter((h) => h.potSize && h.potSize > 0)
-    .map((h) => ({ hand: h.handNumber, pot: h.potSize! / 100 }));
+    .map((h) => ({ hand: h.handNumber, pot: h.potSize! }));
 
   // Action distribution per player
   const actionDistribution: Record<string, Record<string, number>> = {};
@@ -166,14 +166,29 @@ function computePlayerStats(name: string, hands: ParsedHand[]): PlayerAnalytics 
       runningChips = hand.startingStacks[name];
     }
 
-    // Compute net for this hand: if won, net = potSize - amountPutIn. If lost, net = -amountPutIn
-    const totalPutIn = playerEvents
-      .filter((e) => ["call", "raise", "bet", "small_blind", "big_blind"].includes(e.action))
+    // Compute net for this hand using win events
+    // Winner: collected amount from pot (winAmount) is their total return
+    // We track the cumulative chip change using collected amounts vs blind/call costs
+    const winEvents = playerEvents.filter((e) => e.action === "win");
+    const collectedAmount = winEvents.reduce((sum, e) => sum + (e.amount || 0), 0);
+    // What they put in: blinds + calls + bets (but NOT raises, since raise amount in PokerNow is cumulative)
+    const blindCost = playerEvents
+      .filter((e) => ["small_blind", "big_blind"].includes(e.action))
       .reduce((sum, e) => sum + (e.amount || 0), 0);
-    const isWinner = hand.winner === name;
-    const handNet = isWinner ? (hand.potSize || hand.winAmount || 0) - totalPutIn : -totalPutIn;
-    // Convert from chips to shekels (divide by 100)
-    runningChips += handNet / 100;
+    // For non-blind costs, we use the last bet/raise/call per round as the actual cost
+    const otherCost = playerEvents
+      .filter((e) => ["call", "bet"].includes(e.action))
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
+    // Raises replace previous bets, so just use the max raise per position
+    const raisePositions = new Map<string, number>();
+    for (const e of playerEvents.filter((e) => e.action === "raise")) {
+      const current = raisePositions.get(e.position) || 0;
+      raisePositions.set(e.position, Math.max(current, e.amount || 0));
+    }
+    const raiseCost = Array.from(raisePositions.values()).reduce((a, b) => a + b, 0);
+    const totalCost = blindCost + otherCost + raiseCost;
+    const handNet = collectedAmount - totalCost;
+    runningChips += handNet;
 
     // VPIP: voluntarily put money in pot (call/raise/bet pre-flop, excluding blinds)
     const preFlopActions = playerEvents.filter(
@@ -191,15 +206,15 @@ function computePlayerStats(name: string, hands: ParsedHand[]): PlayerAnalytics 
       switch (e.action) {
         case "call":
           calls++;
-          if (e.amount) callAmounts.push(e.amount / 100);
+          if (e.amount) callAmounts.push(e.amount);
           break;
         case "raise":
           raises++;
-          if (e.amount) raiseAmounts.push(e.amount / 100);
+          if (e.amount) raiseAmounts.push(e.amount);
           break;
         case "bet":
           bets++;
-          if (e.amount) betAmounts.push(e.amount / 100);
+          if (e.amount) betAmounts.push(e.amount);
           break;
         case "fold":
           folds++;
@@ -214,7 +229,7 @@ function computePlayerStats(name: string, hands: ParsedHand[]): PlayerAnalytics 
     const won = hand.winner === name;
     if (won) {
       handsWon++;
-      const winAmount = (hand.winAmount || 0) / 100;
+      const winAmount = (hand.winAmount || 0);
       totalWon += winAmount;
       if (winAmount > biggestWin) biggestWin = winAmount;
       currentStreak++;
@@ -229,7 +244,7 @@ function computePlayerStats(name: string, hands: ParsedHand[]): PlayerAnalytics 
       // Calculate loss for this hand (sum of amounts put in)
       const totalPutInLoss = playerEvents
         .filter((e) => ["call", "raise", "bet", "small_blind", "big_blind"].includes(e.action))
-        .reduce((sum, e) => sum + (e.amount || 0), 0) / 100;
+        .reduce((sum, e) => sum + (e.amount || 0), 0);
       if (totalPutInLoss > biggestLoss) biggestLoss = totalPutInLoss;
 
       currentStreak = 0;
@@ -291,8 +306,8 @@ function computeHeadToHead(p1: string, p2: string, hands: ParsedHand[]): HeadToH
   }
 
   return {
-    calls: { count: callCount, avgAmount: callCount > 0 ? (callTotal / callCount) / 100 : 0 },
-    raises: { count: raiseCount, avgAmount: raiseCount > 0 ? (raiseTotal / raiseCount) / 100 : 0 },
+    calls: { count: callCount, avgAmount: callCount > 0 ? (callTotal / callCount) : 0 },
+    raises: { count: raiseCount, avgAmount: raiseCount > 0 ? (raiseTotal / raiseCount) : 0 },
     folds: foldCount,
   };
 }
