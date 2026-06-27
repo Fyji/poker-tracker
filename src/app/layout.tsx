@@ -10,8 +10,8 @@ const geistSans = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Poker Tracker 🃏",
-  description: "Track poker game results and debts",
+  title: "כבש הכבשים 🐑",
+  description: "מעקב תוצאות פוקר וחובות",
 };
 
 export default function RootLayout({
@@ -25,7 +25,7 @@ export default function RootLayout({
         <nav className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm sticky top-0 z-50">
           <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-6">
             <Link href="/" className="text-xl font-bold text-emerald-400 hover:text-emerald-300 transition">
-              🃏 פוקר טראקר
+              🐑 כבש הכבשים
             </Link>
             <div className="flex gap-4 mr-auto text-sm">
               <Link href="/" className="text-zinc-400 hover:text-zinc-100 transition">
