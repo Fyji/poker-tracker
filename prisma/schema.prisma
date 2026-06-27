@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Player {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  createdAt   DateTime     @default(now())
+  gameResults GameResult[]
+
+  @@map("players")
+}
+
+model Game {
+  id          String       @id @default(cuid())
+  pokernowId  String       @unique
+  playedAt    DateTime     @default(now())
+  createdAt   DateTime     @default(now())
+  gameResults GameResult[]
+  debts       Debt[]
+
+  @@map("games")
+}
+
+model GameResult {
+  id       String @id @default(cuid())
+  gameId   String
+  playerId String
+  buyIn    Float
+  net      Float
+  rawData  Json?
+
+  game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, playerId])
+  @@map("game_results")
+}
+
+model Debt {
+  id        String   @id @default(cuid())
+  gameId    String
+  fromName  String
+  toName    String
+  amount    Float
+  paid      Boolean  @default(false)
+  paidAt    DateTime?
+  createdAt DateTime @default(now())
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@map("debts")
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  debtId    String
+  amount    Float
+  paidAt    DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@map("payments")
+}
